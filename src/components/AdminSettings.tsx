@@ -6,10 +6,10 @@ import { ApiSettings } from '../types';
 
 export function AdminSettings() {
   const [settings, setSettings] = useState<ApiSettings>({
-    apiKey: '',
+    apiKey: import.meta.env.VITE_ACTIVATION_API_KEY || '',
     panelUsername: '',
     panelPassword: '',
-    panelBaseUrl: 'https://activationpanel.net/api/api.php'
+    panelBaseUrl: import.meta.env.VITE_ACTIVATION_API_URL || 'https://activationpanel.net/api/api.php'
   });
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);

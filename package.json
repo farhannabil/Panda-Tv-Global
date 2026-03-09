@@ -7,7 +7,7 @@
     "dev": "tsx server.ts",
     "build": "npm run build:client && npm run build:server",
     "build:client": "vite build",
-    "build:server": "tsc server.ts --outDir . --module commonjs --esModuleInterop --resolveJsonModule --skipLibCheck",
+    "build:server": "cp server.ts dist-server/server.ts",
     "start": "node server.js",
     "clean": "rm -rf dist server.js",
     "lint": "tsc --noEmit"

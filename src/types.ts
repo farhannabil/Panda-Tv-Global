@@ -10,11 +10,18 @@ export interface User {
   uid: string;
   email: string;
   username: string;
+  name?: string; // Full name of the reseller
+  phone?: string; // Phone number
   role: UserRole;
   parentId?: string;
   credits: number;
   status: UserStatus;
   createdAt: string;
+  apiKey?: string; // Activation Panel API Key for this reseller
+  activationUsername?: string; // Username for Activation Panel
+  activationPassword?: string; // Password for Activation Panel
+  pandaUsername?: string; // Username for Panda Panel login
+  pandaPassword?: string; // Password for Panda Panel login
 }
 
 export interface Line {

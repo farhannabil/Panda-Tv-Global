@@ -4,7 +4,8 @@ import { GoogleGenAI } from "@google/genai";
 import Markdown from 'react-markdown';
 import { clsx } from 'clsx';
 
-const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY || '' });
+// Use Vite environment variable format
+const ai = new GoogleGenAI({ apiKey: import.meta.env.VITE_GEMINI_API_KEY || '' });
 
 export function AITools() {
   const [activeTool, setActiveTool] = useState<'analyst' | 'pitcher' | 'hype' | null>(null);
@@ -51,11 +52,9 @@ export function AITools() {
 
     try {
       const response = await ai.models.generateContent({
-        model: "gemini-3.1-pro-preview",
+        model: "gemini-2.5-flash",
         contents: [{ role: 'user', parts: [{ text: tool.prompt }] }],
-        config: {
-          systemInstruction: "You are the Panda IPTV AI Core. You provide strategic intelligence for resellers. Your tone is futuristic, efficient, and highly professional. Use markdown for formatting.",
-        }
+        systemInstruction: "You are the Panda IPTV AI Core. You provide strategic intelligence for resellers. Your tone is futuristic, efficient, and highly professional. Use markdown for formatting.",
       });
 
       setResult(response.text || "Neural link interrupted. Retry deployment.");

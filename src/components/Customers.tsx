@@ -3,11 +3,12 @@ import {
   Search, Filter, MoreVertical, Edit2, Info, 
   RefreshCw, Trash2, Shield, Upload, Move, 
   RotateCcw, Ban, CheckCircle2, XCircle, Activity, Power,
-  AlertTriangle, Zap, Bell, CheckSquare, Square, MousePointer2, Layers
+  AlertTriangle, Zap, Bell, CheckSquare, Square, MousePointer2, Layers, Copy, Eye, EyeOff, Plus
 } from 'lucide-react';
 import { clsx } from 'clsx';
 import { collection, query, where, onSnapshot } from 'firebase/firestore';
-import { db } from '../lib/firebase';
+import { db, isFirebaseConfigured, isDbReady } from '../lib/firebase';
+import { QuickAddModal } from './QuickAddModal';
 
 interface CustomersProps {
   type?: 'mag' | 'm3u';
@@ -40,11 +41,58 @@ export function Customers({ type = 'mag', userData, setActiveTab }: CustomersPro
   const [hoveredUser, setHoveredUser] = useState<string | null>(null);
   const [lines, setLines] = useState<any[]>([]);
   const [search, setSearch] = useState('');
+  const [visiblePasswords, setVisiblePasswords] = useState<Set<string>>(new Set(['all'])); // Show all by default
+  const [copiedField, setCopiedField] = useState<{id: string, field: string} | null>(null);
+  const [showQuickAdd, setShowQuickAdd] = useState(false);
 
   const isAdmin = userData?.role === 'ADMIN';
 
+  // Toggle password visibility for a specific user
+  const togglePassword = (id: string) => {
+    setVisiblePasswords(prev => {
+      const newSet = new Set(prev);
+      if (newSet.has('all')) {
+        // If all are visible, hide this one
+        newSet.delete('all');
+        newSet.add(id);
+      } else if (newSet.has(id)) {
+        // If this one is visible, check if it's the only one
+        newSet.delete(id);
+      } else {
+        newSet.add(id);
+      }
+      return newSet;
+    });
+  };
+
+  // Copy to clipboard
+  const copyToClipboard = (id: string, value: string, field: string) => {
+    navigator.clipboard.writeText(value);
+    setCopiedField({ id, field });
+    setTimeout(() => setCopiedField(null), 2000);
+  };
+
   useEffect(() => {
-    if (!userData || !db) return;
+    // Check if we're in demo mode
+    const isDemo = typeof window !== 'undefined' && 
+      new URLSearchParams(window.location.search).get('demo') === 'true';
+    
+    // Use mock data when db is not configured or in demo mode
+    if (isDemo || !isDbReady() || !userData) {
+      // Use mock data for demo mode
+      setLines(mockUsers.map((u, i) => ({
+        id: u.id,
+        identifier: u.username,
+        password: u.password,
+        expireDate: u.expire,
+        status: u.status === 'Active' ? 'active' : u.status.toLowerCase(),
+        online: u.online,
+        type: type,
+        package: u.package,
+        notes: u.notes,
+      })));
+      return;
+    }
 
     const linesRef = collection(db, 'lines');
     const q = isAdmin
@@ -55,7 +103,7 @@ export function Customers({ type = 'mag', userData, setActiveTab }: CustomersPro
       const linesData = snapshot.docs.map(doc => ({
         id: doc.id,
         ...doc.data(),
-        status: new Date(doc.data().expireDate) > new Date() ? 'Active' : 'Expired'
+        status: new Date(doc.data().expireDate) > new Date() ? 'active' : 'expired'
       }));
       setLines(linesData);
     });
@@ -125,6 +173,12 @@ export function Customers({ type = 'mag', userData, setActiveTab }: CustomersPro
               className="w-full bg-void border border-white/10 rounded-lg pl-10 pr-4 py-2 text-white focus:border-cyan-400 outline-none transition-all" 
             />
           </div>
+          <button 
+            onClick={() => setShowQuickAdd(true)}
+            className="px-4 py-2 bg-cyan-500/20 border border-cyan-500/50 rounded-lg text-cyan-400 hover:bg-cyan-500/30 transition-all flex items-center gap-2"
+          >
+            <Plus className="w-4 h-4" /> Quick Add
+          </button>
           <button className="px-4 py-2 bg-white/5 border border-white/10 rounded-lg text-white hover:bg-white/10 transition-all flex items-center gap-2">
             <Filter className="w-4 h-4" /> Filter
           </button>
@@ -157,7 +211,7 @@ export function Customers({ type = 'mag', userData, setActiveTab }: CustomersPro
               <tr className="border-b border-border-glow bg-white/5">
                 <th className="px-4 py-4 w-10">
                   <button onClick={toggleSelectAll} className="text-text-muted hover:text-white transition-colors">
-                    {selectedUsers.length === mockUsers.length ? <CheckSquare className="w-4 h-4 text-cyan-400" /> : <Square className="w-4 h-4" />}
+                    {selectedUsers.length === filteredLines.length ? <CheckSquare className="w-4 h-4 text-cyan-400" /> : <Square className="w-4 h-4" />}
                   </button>
                 </th>
                 <th className="px-6 py-4 text-[10px] font-mono text-text-muted uppercase tracking-widest font-semibold">Status</th>
@@ -184,8 +238,10 @@ export function Customers({ type = 'mag', userData, setActiveTab }: CustomersPro
                     <div className="flex items-center gap-2">
                       <span className={clsx(
                         "inline-flex items-center px-2 py-0.5 rounded-full text-[8px] font-mono font-bold uppercase tracking-wider border",
-                        line.status === 'Active' ? "bg-cyan-400/10 text-cyan-400 border-cyan-400/30" :
-                        "bg-pink-400/10 text-pink-400 border-pink-400/30"
+                        line.status === 'active' ? "bg-emerald-400/10 text-emerald-400 border-emerald-400/30" :
+                        line.status === 'expired' ? "bg-red-400/10 text-red-400 border-red-400/30" :
+                        line.status === 'suspended' ? "bg-orange-400/10 text-orange-400 border-orange-400/30" :
+                        "bg-gray-400/10 text-gray-400 border-gray-400/30"
                       )}>
                         {line.status}
                       </span>
@@ -196,7 +252,36 @@ export function Customers({ type = 'mag', userData, setActiveTab }: CustomersPro
                       <span className="font-mono text-xs text-white font-bold">{line.identifier}</span>
                     </div>
                   </td>
-                  <td className="px-6 py-4 font-mono text-[10px] text-text-muted">********</td>
+                  <td className="px-6 py-4">
+                    <div className="flex items-center gap-2">
+                      <div className="flex flex-col gap-0.5">
+                        <span className="font-mono text-[9px] text-cyan-400 uppercase tracking-wider">ID: {line.id}</span>
+                        <div className="flex items-center gap-1">
+                          <span className="font-mono text-xs text-white">
+                            {visiblePasswords.has('all') || visiblePasswords.has(line.id) ? line.password : '••••••••'}
+                          </span>
+                          <button
+                            onClick={() => togglePassword(line.id)}
+                            className="p-1 hover:bg-white/10 rounded transition-colors"
+                          >
+                            {visiblePasswords.has('all') || visiblePasswords.has(line.id) ? 
+                              <EyeOff className="w-3 h-3 text-text-muted" /> : 
+                              <Eye className="w-3 h-3 text-text-muted" />
+                            }
+                          </button>
+                          <button
+                            onClick={() => copyToClipboard(line.id, line.password, 'password')}
+                            className="p-1 hover:bg-white/10 rounded transition-colors"
+                          >
+                            {copiedField?.id === line.id && copiedField?.field === 'password' ? 
+                              <CheckSquare className="w-3 h-3 text-emerald-400" /> : 
+                              <Copy className="w-3 h-3 text-cyan-400" />
+                            }
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  </td>
                   <td className="px-6 py-4 text-xs text-white font-mono">{line.expireDate?.split('T')[0]}</td>
                   {isAdmin && <td className="px-6 py-4 text-xs text-text-muted uppercase tracking-wider">{line.resellerUid?.slice(0, 8)}...</td>}
                   <td className="px-6 py-4">
@@ -240,17 +325,32 @@ export function Customers({ type = 'mag', userData, setActiveTab }: CustomersPro
         </div>
         
         <div className="border-t border-border-glow p-4 flex items-center justify-between bg-white/5">
-          <p className="text-[10px] font-mono text-text-muted uppercase tracking-widest">Showing 1 to 12 of 369 entries</p>
+          <p className="text-[10px] font-mono text-text-muted uppercase tracking-widest">
+            Showing {filteredLines.length > 0 ? 1 : 0} to {Math.min(12, filteredLines.length)} of {filteredLines.length} entries
+          </p>
           <div className="flex items-center gap-2">
             <button className="px-3 py-1 rounded border border-white/10 text-[10px] font-mono text-text-muted hover:bg-white/5 hover:text-white transition-colors uppercase">Prev</button>
             <button className="px-3 py-1 rounded bg-cyan-400/20 border border-cyan-400/50 text-[10px] font-mono text-cyan-400 font-bold shadow-[0_0_10px_rgba(0,245,255,0.3)]">1</button>
-            <button className="px-3 py-1 rounded border border-white/10 text-[10px] font-mono text-text-muted hover:bg-white/5 hover:text-white transition-colors">2</button>
-            <button className="px-3 py-1 rounded border border-white/10 text-[10px] font-mono text-text-muted hover:bg-white/5 hover:text-white transition-colors">3</button>
-            <span className="text-text-muted px-1 text-[10px]">...</span>
-            <button className="px-3 py-1 rounded border border-white/10 text-[10px] font-mono text-text-muted hover:bg-white/5 hover:text-white transition-colors uppercase">Next</button>
+            {filteredLines.length > 12 && (
+              <button className="px-3 py-1 rounded border border-white/10 text-[10px] font-mono text-text-muted hover:bg-white/5 hover:text-white transition-colors">2</button>
+            )}
+            {filteredLines.length > 24 && (
+              <>
+                <span className="text-text-muted px-1 text-[10px]">...</span>
+                <button className="px-3 py-1 rounded border border-white/10 text-[10px] font-mono text-text-muted hover:bg-white/5 hover:text-white transition-colors uppercase">Next</button>
+              </>
+            )}
           </div>
         </div>
       </div>
+
+      {/* Quick Add Modal */}
+      <QuickAddModal 
+        isOpen={showQuickAdd} 
+        onClose={() => setShowQuickAdd(false)} 
+        type={type}
+        userData={userData}
+      />
     </div>
   );
 }

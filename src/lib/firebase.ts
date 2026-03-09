@@ -16,7 +16,7 @@ const firebaseConfig = {
 };
 
 // Check if the config is valid
-export const isFirebaseConfigured = true;
+const _isFirebaseConfigured = true;
 
 export const getFirebaseDiagnostics = () => ({
   hasApiKey: true,
@@ -26,6 +26,11 @@ export const getFirebaseDiagnostics = () => ({
   authDomain: firebaseConfig.authDomain,
   isConfigured: true
 });
+
+// Export as a getter function to avoid duplicate export
+export function isFirebaseConfigured(): boolean {
+  return _isFirebaseConfigured;
+}
 
 let app: FirebaseApp | undefined;
 let auth: Auth | undefined;
@@ -54,3 +59,8 @@ try {
 }
 
 export { auth, db };
+
+// Helper to check if Firebase is actually initialized
+export function isDbReady(): boolean {
+  return !!db && isFirebaseConfigured();
+}

@@ -4,7 +4,8 @@ import { GoogleGenAI } from "@google/genai";
 import Markdown from 'react-markdown';
 import { clsx } from 'clsx';
 
-const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY || '' });
+// Use Vite environment variable format
+const ai = new GoogleGenAI({ apiKey: import.meta.env.VITE_GEMINI_API_KEY || '' });
 
 export function Chatbot() {
   const [isOpen, setIsOpen] = useState(false);
@@ -31,14 +32,12 @@ export function Chatbot() {
 
     try {
       const response = await ai.models.generateContent({
-        model: "gemini-3.1-pro-preview",
+        model: "gemini-2.5-flash",
         contents: messages.concat({ role: 'user', text: userMsg }).map(m => ({
           role: m.role,
           parts: [{ text: m.text }]
         })),
-        config: {
-          systemInstruction: "You are the Panda IPTV AI Assistant. You help resellers manage their business, explain technical features like Anti-Freeze technology, DDoS protection, and global CDN. You are professional, futuristic, and helpful. Keep responses concise and use cyberpunk terminology where appropriate.",
-        }
+        systemInstruction: "You are the Panda IPTV AI Assistant. You help resellers manage their business, explain technical features like Anti-Freeze technology, DDoS protection, and global CDN. You are professional, futuristic, and helpful. Keep responses concise and use cyberpunk terminology where appropriate.",
       });
 
       const aiText = response.text || "I encountered a glitch in the matrix. Please try again.";
@@ -145,7 +144,7 @@ export function Chatbot() {
           </div>
           <div className="mt-2 flex items-center justify-center gap-1 text-[10px] font-mono text-text-muted uppercase tracking-widest">
             <Sparkles className="w-3 h-3 text-cyan" />
-            Powered by Gemini 3.1 Pro
+            Powered by Gemini 2.5 Flash
           </div>
         </div>
       </div>

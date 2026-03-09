@@ -6,6 +6,10 @@ export interface IPTVResponse {
   code?: string;
   username?: string;
   password?: string;
+  credits?: string;
+  lines_count?: string;
+  active_lines?: string;
+  exp_date?: string;
   [key: string]: any;
 }
 
@@ -35,9 +39,28 @@ export const iptvService = {
     return await response.json();
   },
 
-  async getResellerInfo(): Promise<IPTVResponse> {
-    const response = await fetch('/api/reseller-info', { method: 'POST' });
+  async getResellerInfo(resellerUid?: string): Promise<IPTVResponse> {
+    const response = await fetch('/api/reseller-info', { 
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ resellerUid })
+    });
     const data = await response.json();
     return Array.isArray(data) ? data[0] : data;
+  },
+
+  async syncReseller(resellerUid: string): Promise<IPTVResponse> {
+    const response = await fetch('/api/sync', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ resellerUid })
+    });
+    const data = await response.json();
+    return Array.isArray(data) ? data[0] : data;
+  },
+
+  async syncAllResellers(): Promise<any> {
+    const response = await fetch('/api/sync-all-resellers', { method: 'POST' });
+    return await response.json();
   }
 };

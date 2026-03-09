@@ -90,6 +90,7 @@ export function Sidebar({ activeTab, setActiveTab, userRole, onLogout }: {
       ]
     },
     { icon: UserPlus, label: 'Subsellers', id: 'subsellers' },
+    { icon: AlertCircle, label: 'Report Issue', id: 'report' },
     { icon: MessageSquare, label: 'Support Chat', id: 'support-chat' },
     { icon: Ticket, label: 'Tickets', id: 'ticket' },
   ];

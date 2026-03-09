@@ -18,6 +18,7 @@ import { DeviceForm } from './components/DeviceForm';
 import { LogsTable } from './components/LogsTable';
 import { AdminSettings } from './components/AdminSettings';
 import { AdminResellers } from './components/AdminResellers';
+import { ReportForm } from './components/ReportForm';
 import { AdminCredits } from './components/AdminCredits';
 import { AdminAnnouncements } from './components/AdminAnnouncements';
 import { ResellerSubsellers } from './components/ResellerSubsellers';
@@ -94,8 +95,25 @@ function MainLayout({
   isGlassmorphic: boolean,
   setIsGlassmorphic: React.Dispatch<React.SetStateAction<boolean>>
 }) {
-  const [activeTab, setActiveTab] = useState('dashboard');
+  const [activeTab, setActiveTab] = useState(() => {
+    // Check URL for tab parameter on initial load
+    if (typeof window !== 'undefined') {
+      const params = new URLSearchParams(window.location.search);
+      const tab = params.get('tab');
+      if (tab) return tab;
+    }
+    return 'dashboard';
+  });
   const [isSystemPanelOpen, setIsSystemPanelOpen] = useState(false);
+  
+  // Sync activeTab to URL when it changes
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    params.set('tab', activeTab);
+    const newUrl = `${window.location.pathname}?${params.toString()}`;
+    window.history.replaceState({}, '', newUrl);
+  }, [activeTab]);
+
   const isAdmin = userData.role === 'ADMIN';
   const isReseller = userData.role === 'RESELLER' || userData.role === 'SUBSELLER';
 
@@ -133,6 +151,8 @@ function MainLayout({
         return isAdmin ? <AdminAnnouncements /> : <Dashboard userData={userData} setActiveTab={setActiveTab} />;
       case 'subsellers':
         return isReseller ? <ResellerSubsellers userData={userData} /> : <Dashboard userData={userData} setActiveTab={setActiveTab} />;
+      case 'report':
+        return <ReportForm userData={userData} />;
       case 'support-chat':
         return <SupportChat userData={userData} />;
       case 'tools-services':
@@ -212,7 +232,32 @@ export default function App() {
   const [loading, setLoading] = useState(true);
   const [isGlassmorphic, setIsGlassmorphic] = useState(true);
 
+  // DEMO MODE: Bypass Firebase for testing
+  const [demoMode, setDemoMode] = useState(false);
+
   useEffect(() => {
+    // Check for demo mode flag in URL
+    const params = new URLSearchParams(window.location.search);
+    if (params.get('demo') === 'true') {
+      setDemoMode(true);
+      // Check if demo should be reseller or admin
+      const demoRole = params.get('role') || 'ADMIN';
+      // Create demo user data
+      setUser({ uid: 'demo-user', email: () => 'demo@pandapanel.tv' } as any);
+      setUserData({
+        uid: 'demo-user',
+        email: 'demo@pandapanel.tv',
+        username: demoRole === 'RESELLER' ? 'DemoReseller' : 'DemoAdmin',
+        role: demoRole,
+        status: 'approved',
+        credits: demoRole === 'RESELLER' ? 50 : 9999,
+        createdAt: new Date(),
+        parentId: demoRole === 'RESELLER' ? 'admin-uid' : null
+      });
+      setLoading(false);
+      return;
+    }
+
     if (!isFirebaseConfigured || !auth) {
       setLoading(false);
       return;
@@ -315,43 +360,22 @@ export default function App() {
     );
   }
 
+  // Demo mode - show dashboard directly
+  if (demoMode && userData) {
+    return (
+      <MainLayout 
+        userData={userData} 
+        handleLogout={() => { setDemoMode(false); setUserData(null); }} 
+        isGlassmorphic={isGlassmorphic} 
+        setIsGlassmorphic={setIsGlassmorphic} 
+      />
+    );
+  }
+
   if (loading) {
     return (
       <div className="h-screen w-screen bg-void flex items-center justify-center">
         <div className="w-12 h-12 border-4 border-cyan/20 border-t-cyan rounded-full animate-spin" />
-      </div>
-    );
-  }
-
-  if (user && !userData && !loading) {
-    return (
-      <div className="min-h-screen bg-void flex items-center justify-center p-6 text-center">
-        <Background />
-        <div className="glass-panel p-12 rounded-[2.5rem] max-w-md w-full space-y-8 border-cyan/30 relative z-10">
-          <div className="w-20 h-20 bg-cyan/10 rounded-2xl flex items-center justify-center mx-auto border border-cyan/30 shadow-[0_0_30px_rgba(0,245,255,0.2)] mb-4">
-            <Activity className="w-10 h-10 text-cyan animate-pulse" />
-          </div>
-          <h1 className="text-2xl font-display font-black text-white uppercase italic tracking-tighter">
-            Establishing <span className="text-cyan">Neural Link</span>
-          </h1>
-          <p className="text-[10px] font-mono text-text-muted uppercase tracking-[0.3em] leading-relaxed">
-            The system is synchronizing your profile data. If this takes more than a few seconds, please check your connection.
-          </p>
-          <div className="flex flex-col gap-3">
-            <button 
-              onClick={() => window.location.reload()}
-              className="w-full py-4 bg-cyan/10 border border-cyan/20 rounded-xl text-cyan font-mono text-[10px] font-bold uppercase tracking-widest hover:bg-cyan/20 transition-all"
-            >
-              Retry Connection
-            </button>
-            <button 
-              onClick={handleLogout}
-              className="w-full py-4 bg-white/5 border border-white/10 rounded-xl text-text-muted font-mono text-[10px] font-bold uppercase tracking-widest hover:bg-white/10 transition-all"
-            >
-              Sign Out
-            </button>
-          </div>
-        </div>
       </div>
     );
   }
