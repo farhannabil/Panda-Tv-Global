@@ -4,11 +4,10 @@ import {
   Settings, LogOut, Tv, Link, ChevronDown, ChevronRight, 
   Download, Send, AlertCircle, Ticket, FileText, Wrench, 
   UserPlus, History, CreditCard, RefreshCw, FileX, Layers, 
-  Bell, BarChart3, Shield, MessageSquare, Megaphone
+  Bell, BarChart3, Shield
 } from 'lucide-react';
 import { clsx } from 'clsx';
 import { twMerge } from 'tailwind-merge';
-import { UserRole } from '../types';
 
 interface NavItem {
   icon: any;
@@ -17,85 +16,37 @@ interface NavItem {
   subItems?: { label: string; id: string }[];
 }
 
-export function Sidebar({ activeTab, setActiveTab, userRole, onLogout }: { 
-  activeTab: string, 
-  setActiveTab: (id: string) => void, 
-  userRole?: UserRole,
-  onLogout: () => void 
-}) {
-  const [expandedItems, setExpandedItems] = useState<string[]>(['mag', 'm3u', 'logs', 'tools', 'resellers']);
-  const isAdmin = userRole === 'ADMIN';
+const mainNav: NavItem[] = [
+  { icon: LayoutDashboard, label: 'Dashboard', id: 'dashboard' },
+  { icon: BarChart3, label: 'Statistics', id: 'statistics' },
+];
 
-  const toggleExpand = (id: string) => {
-    setExpandedItems(prev => 
-      prev.includes(id) ? prev.filter(i => i !== id) : [...prev, id]
-    );
-  };
+const clientNav: NavItem[] = [
+  { 
+    icon: Tv, 
+    label: 'MAG DEVICES', 
+    id: 'mag',
+    subItems: [
+      { label: 'Add Device', id: 'mag-add' },
+      { label: 'Quick Add New', id: 'mag-quick' },
+      { label: 'Userlist', id: 'mag-list' },
+    ]
+  },
+  { 
+    icon: Link, 
+    label: 'M3U Lines', 
+    id: 'm3u',
+    subItems: [
+      { label: 'Add Device', id: 'm3u-add' },
+      { label: 'Quick Add New', id: 'm3u-quick' },
+      { label: 'Userlist', id: 'm3u-list' },
+    ]
+  },
+];
 
-  const mainNav: NavItem[] = [
-    { icon: LayoutDashboard, label: 'Dashboard', id: 'dashboard' },
-    { icon: BarChart3, label: 'Statistics', id: 'statistics' },
-  ];
-
-  const adminNav: NavItem[] = [
-    { 
-      icon: Users, 
-      label: 'Resellers', 
-      id: 'resellers',
-      subItems: [
-        { label: 'Manage Resellers', id: 'admin-resellers' },
-        { label: 'Pending Approvals', id: 'admin-pending' },
-        { label: 'Add Credits', id: 'admin-credits' },
-      ]
-    },
-    { 
-      icon: Tv, 
-      label: 'Global MAG', 
-      id: 'mag',
-      subItems: [
-        { label: 'All MAG Devices', id: 'mag-list' },
-      ]
-    },
-    { 
-      icon: Link, 
-      label: 'Global M3U', 
-      id: 'm3u',
-      subItems: [
-        { label: 'All M3U Lines', id: 'm3u-list' },
-      ]
-    },
-    { icon: Megaphone, label: 'Announcements', id: 'admin-announcements' },
-    { icon: Settings, label: 'Admin Settings', id: 'admin-settings' },
-  ];
-
-  const resellerNav: NavItem[] = [
-    { 
-      icon: Tv, 
-      label: 'MAG DEVICES', 
-      id: 'mag',
-      subItems: [
-        { label: 'Add Device', id: 'mag-add' },
-        { label: 'Quick Add New', id: 'mag-quick' },
-        { label: 'Userlist', id: 'mag-list' },
-      ]
-    },
-    { 
-      icon: Link, 
-      label: 'M3U Lines', 
-      id: 'm3u',
-      subItems: [
-        { label: 'Add Device', id: 'm3u-add' },
-        { label: 'Quick Add New', id: 'm3u-quick' },
-        { label: 'Userlist', id: 'm3u-list' },
-      ]
-    },
-    { icon: UserPlus, label: 'Subsellers', id: 'subsellers' },
-    { icon: AlertCircle, label: 'Report Issue', id: 'report' },
-    { icon: MessageSquare, label: 'Support Chat', id: 'support-chat' },
-    { icon: Ticket, label: 'Tickets', id: 'ticket' },
-  ];
-
-  const logsNav: NavItem = { 
+const otherNav: NavItem[] = [
+  { icon: Ticket, label: 'Open a ticket', id: 'ticket' },
+  { 
     icon: FileText, 
     label: 'Logs', 
     id: 'logs',
@@ -105,17 +56,27 @@ export function Sidebar({ activeTab, setActiveTab, userRole, onLogout }: {
       { label: 'Transaction logs', id: 'logs-transaction' },
       { label: 'Refund Logs', id: 'logs-refund' },
     ]
-  };
-
-  const toolsNav: NavItem = { 
+  },
+  { 
     icon: Wrench, 
     label: 'Tools', 
     id: 'tools',
     subItems: [
-      { label: 'My Services', id: 'tools-services' },
-      { label: 'Bulk Operations', id: 'tools-bulk' },
+      { label: 'Request credit', id: 'tools-credit' },
+      { label: 'Templates', id: 'tools-templates' },
+      { label: 'Downloads', id: 'tools-downloads' },
       { label: 'Latest Updates', id: 'tools-updates' },
     ]
+  },
+];
+
+export function Sidebar({ activeTab, setActiveTab }: { activeTab: string, setActiveTab: (id: string) => void }) {
+  const [expandedItems, setExpandedItems] = useState<string[]>(['mag', 'm3u', 'logs', 'tools']);
+
+  const toggleExpand = (id: string) => {
+    setExpandedItems(prev => 
+      prev.includes(id) ? prev.filter(i => i !== id) : [...prev, id]
+    );
   };
 
   const renderNavItem = (item: NavItem, colorClass: string = "text-cyan-400", bgClass: string = "bg-cyan-400/10", borderClass: string = "border-cyan-400/50", glowClass: string = "shadow-[0_0_15px_rgba(0,245,255,0.2)]") => {
@@ -185,27 +146,17 @@ export function Sidebar({ activeTab, setActiveTab, userRole, onLogout }: {
           {mainNav.map(item => renderNavItem(item))}
         </div>
 
-        {isAdmin ? (
-          <div>
-            <h3 className="px-4 text-[10px] font-mono text-text-muted uppercase tracking-[0.3em] mb-3 opacity-50">Master Control</h3>
-            <div className="space-y-1">
-              {adminNav.map(item => renderNavItem(item, "text-red", "bg-red/10", "border-red/50", "shadow-[0_0_15px_rgba(255,48,96,0.2)]"))}
-            </div>
+        <div>
+          <h3 className="px-4 text-[10px] font-mono text-text-muted uppercase tracking-[0.3em] mb-3 opacity-50">Operations</h3>
+          <div className="space-y-1">
+            {clientNav.map(item => renderNavItem(item, "text-violet-400", "bg-violet-400/10", "border-violet-400/50", "shadow-[0_0_15px_rgba(139,0,255,0.2)]"))}
           </div>
-        ) : (
-          <div>
-            <h3 className="px-4 text-[10px] font-mono text-text-muted uppercase tracking-[0.3em] mb-3 opacity-50">Operations</h3>
-            <div className="space-y-1">
-              {resellerNav.map(item => renderNavItem(item, "text-violet-400", "bg-violet-400/10", "border-violet-400/50", "shadow-[0_0_15px_rgba(139,0,255,0.2)]"))}
-            </div>
-          </div>
-        )}
+        </div>
 
         <div>
           <h3 className="px-4 text-[10px] font-mono text-text-muted uppercase tracking-[0.3em] mb-3 opacity-50">Infrastructure</h3>
           <div className="space-y-1">
-            {renderNavItem(logsNav, "text-pink-400", "bg-pink-400/10", "border-pink-400/50", "shadow-[0_0_15px_rgba(255,0,128,0.2)]")}
-            {renderNavItem(toolsNav, "text-emerald-400", "bg-emerald-400/10", "border-emerald-400/50", "shadow-[0_0_15px_rgba(16,185,129,0.2)]")}
+            {otherNav.map(item => renderNavItem(item, "text-pink-400", "bg-pink-400/10", "border-pink-400/50", "shadow-[0_0_15px_rgba(255,0,128,0.2)]"))}
           </div>
         </div>
 
@@ -231,10 +182,18 @@ export function Sidebar({ activeTab, setActiveTab, userRole, onLogout }: {
       </div>
 
       <div className="mt-auto pt-4 border-t border-white/5 relative z-10">
-        <button 
-          onClick={onLogout}
-          className="w-full flex items-center gap-3 px-4 py-3 rounded-lg text-sm font-medium text-text-muted hover:text-red hover:bg-red/10 transition-all duration-300 group"
-        >
+        <div className="px-4 mb-4">
+          <div className="flex items-center gap-3 p-3 rounded-xl bg-cyan/5 border border-cyan/20">
+            <div className="w-8 h-8 rounded-lg bg-cyan/10 flex items-center justify-center">
+              <Shield className="w-4 h-4 text-cyan" />
+            </div>
+            <div>
+              <p className="text-[10px] font-bold text-white uppercase">Security</p>
+              <p className="text-[8px] font-mono text-cyan uppercase">Level 5 Active</p>
+            </div>
+          </div>
+        </div>
+        <button className="w-full flex items-center gap-3 px-4 py-3 rounded-lg text-sm font-medium text-text-muted hover:text-red hover:bg-red/10 transition-all duration-300 group">
           <LogOut className="w-5 h-5 group-hover:rotate-12 transition-transform" />
           Logout
         </button>

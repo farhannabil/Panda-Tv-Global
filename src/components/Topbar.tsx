@@ -3,10 +3,10 @@ import { Bell, Search, User, LogOut, Settings, UserCircle, Zap, Command } from '
 
 interface TopbarProps {
   setActiveTab: (tab: string) => void;
-  onLogout: () => void;
+  setIsLoggedIn: (isLoggedIn: boolean) => void;
 }
 
-export function Topbar({ setActiveTab, onLogout }: TopbarProps) {
+export function Topbar({ setActiveTab, setIsLoggedIn }: TopbarProps) {
   const [isProfileOpen, setIsProfileOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [currentTime, setCurrentTime] = useState(new Date());
@@ -30,10 +30,10 @@ export function Topbar({ setActiveTab, onLogout }: TopbarProps) {
     <div className="h-16 flex items-center justify-between px-8 bg-panel/50 backdrop-blur-lg border-b border-border-glow z-20 relative sticky top-0">
       <div className="flex items-center gap-6 flex-1">
         <div className="flex items-center gap-2">
-          <div className="w-2 h-2 rounded-full bg-cyan animate-pulse shadow-[0_0_8px_#00f5ff]" />
-          <span className="font-mono text-[10px] font-bold text-cyan uppercase tracking-[0.2em]">
-            Panda_Network_Status: <span className="text-white">Optimal</span>
-          </span>
+          <div className="w-2 h-2 rounded-full bg-cyan shadow-[0_0_8px_#00f5ff]" />
+          <h1 className="font-display text-xl font-black text-white tracking-widest hidden lg:block italic">
+            PANDA <span className="text-cyan">TV</span>
+          </h1>
         </div>
         
         {/* News Ticker */}
@@ -58,10 +58,7 @@ export function Topbar({ setActiveTab, onLogout }: TopbarProps) {
         </div>
 
         <div className="flex items-center gap-2">
-          <button 
-            onClick={() => setActiveTab('mag-add')}
-            className="px-4 py-1.5 bg-cyan/10 border border-cyan/30 rounded-lg text-cyan hover:bg-cyan/20 transition-all flex items-center gap-2 text-[10px] font-black uppercase tracking-widest shadow-lg"
-          >
+          <button className="px-4 py-1.5 bg-cyan/10 border border-cyan/30 rounded-lg text-cyan hover:bg-cyan/20 transition-all flex items-center gap-2 text-[10px] font-black uppercase tracking-widest shadow-lg">
             <Zap className="w-3 h-3" /> 24h Trial
           </button>
         </div>
@@ -114,7 +111,7 @@ export function Topbar({ setActiveTab, onLogout }: TopbarProps) {
                 </button>
                 <button 
                   onClick={() => {
-                    setActiveTab('profile');
+                    setActiveTab('settings');
                     setIsProfileOpen(false);
                   }}
                   className="w-full px-4 py-2 flex items-center gap-3 hover:bg-white/5 transition-all text-left group"
@@ -124,7 +121,7 @@ export function Topbar({ setActiveTab, onLogout }: TopbarProps) {
                 </button>
                 <div className="h-px bg-white/5 my-1" />
                 <button 
-                  onClick={onLogout}
+                  onClick={() => setIsLoggedIn(false)}
                   className="w-full px-4 py-2 flex items-center gap-3 hover:bg-red/10 transition-all text-left group"
                 >
                   <LogOut className="w-4 h-4 text-red" />

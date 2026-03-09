@@ -1,15 +1,10 @@
 import React, { useState } from 'react';
 import { VOD_LIST, PACKAGE_LIST } from '../constants';
-import { Save, X, Search, CheckSquare, Square, Wallet, Clock, Tag, DollarSign, Zap, RefreshCw, Loader2, Tv, Layers, Activity, Shield, Globe } from 'lucide-react';
+import { Save, X, Search, CheckSquare, Square, Wallet, Clock, Tag, DollarSign, Zap, RefreshCw } from 'lucide-react';
 import { clsx } from 'clsx';
-import { runTransaction, doc, collection, addDoc, serverTimestamp } from 'firebase/firestore';
-import { db } from '../lib/firebase';
-import { iptvService } from '../services/iptvService';
 
 interface DeviceFormProps {
   type: 'mag' | 'm3u';
-  userData: any;
-  setActiveTab: (tab: string) => void;
 }
 
 const PANDA_SPECIAL_PACKAGES = [
@@ -21,123 +16,12 @@ const PANDA_SPECIAL_PACKAGES = [
   'BroadwayHD', 'Mezzo Live', 'Stingray Classica'
 ];
 
-export function DeviceForm({ type, userData, setActiveTab }: DeviceFormProps) {
-  const [selectedPackage, setSelectedPackage] = useState('PANDA SPECIAL');
-  const [adultEnabled, setAdultEnabled] = useState(false);
+export function DeviceForm({ type }: DeviceFormProps) {
+  const [selectedPackages, setSelectedPackages] = useState<string[]>(PANDA_SPECIAL_PACKAGES);
   const [selectedVODs, setSelectedVODs] = useState<string[]>([]);
   const [packageSearch, setPackageSearch] = useState('');
   const [vodSearch, setVodSearch] = useState('');
-  const [subType, setSubType] = useState<'NEW' | 'RENEW' | 'DEMO'>('NEW');
   const [macAddress, setMacAddress] = useState('');
-  const [username, setUsername] = useState('');
-  const [duration, setDuration] = useState('1'); // 1 month default
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState('');
-  const [success, setSuccess] = useState('');
-
-  const subscriptionCost = subType === 'DEMO' ? 0 : parseInt(duration);
-
-  const handleConfirm = async () => {
-    if (loading) return;
-    setError('');
-    setSuccess('');
-
-    if (type === 'mag' && !macAddress) {
-      setError('MAC Address is required');
-      return;
-    }
-    if (type === 'm3u' && !username && subType !== 'NEW') {
-      setError('Username is required for renewal');
-      return;
-    }
-
-    if (userData.credits < subscriptionCost) {
-      setError('Insufficient credits for this operation');
-      return;
-    }
-
-    if (!db) {
-      setError('System database offline. Check configuration.');
-      return;
-    }
-
-    setLoading(true);
-
-    try {
-      await runTransaction(db, async (transaction) => {
-        const userRef = doc(db, 'users', userData.uid);
-        const userDoc = await transaction.get(userRef);
-
-        if (!userDoc.exists()) throw new Error('User not found');
-        const currentCredits = userDoc.data().credits;
-
-        if (currentCredits < subscriptionCost) {
-          throw new Error('Insufficient credits');
-        }
-
-        // 1. Deduct credits
-        transaction.update(userRef, {
-          credits: currentCredits - subscriptionCost
-        });
-
-        // 2. Call IPTV API
-        const apiResult = await iptvService.provision(
-          type, 
-          type === 'mag' ? macAddress : username, 
-          duration, 
-          selectedPackage.toLowerCase().replace(' ', '_'), 
-          userData.uid
-        );
-
-        if (apiResult.status !== 'true') {
-          throw new Error(apiResult.message || 'IPTV API Error');
-        }
-
-        // 3. Log transaction
-        const logRef = doc(collection(db, 'logs'));
-        transaction.set(logRef, {
-          userId: userData.uid,
-          resellerUid: userData.uid,
-          type: subType,
-          deviceType: type,
-          identifier: type === 'mag' ? macAddress : (apiResult.username || username),
-          amount: subscriptionCost,
-          timestamp: new Date().toISOString(),
-          status: 'success',
-          details: apiResult
-        });
-
-        // 4. Save line info
-        const lineRef = doc(collection(db, 'lines'));
-        const expireDate = new Date();
-        if (subType === 'DEMO') {
-          expireDate.setHours(expireDate.getHours() + 24);
-        } else {
-          expireDate.setMonth(expireDate.getMonth() + parseInt(duration));
-        }
-
-        transaction.set(lineRef, {
-          userId: userData.uid,
-          resellerUid: userData.uid,
-          type: type,
-          identifier: type === 'mag' ? macAddress : (apiResult.username || username),
-          password: apiResult.password || '',
-          url: apiResult.url || '',
-          package: selectedPackage,
-          adult: adultEnabled,
-          expireDate: expireDate.toISOString(),
-          createdAt: new Date().toISOString(),
-          status: 'active'
-        });
-      });
-
-      setSuccess(`Successfully provisioned ${type.toUpperCase()} line!`);
-    } catch (err: any) {
-      setError(err.message || 'Failed to provision line');
-    } finally {
-      setLoading(false);
-    }
-  };
 
   const handleMacChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     let value = e.target.value.toUpperCase().replace(/[^0-9A-F]/g, '');
@@ -148,12 +32,20 @@ export function DeviceForm({ type, userData, setActiveTab }: DeviceFormProps) {
     setMacAddress(formatted);
   };
 
+  const togglePackage = (pkg: string) => {
+    if (PANDA_SPECIAL_PACKAGES.includes(pkg)) return; // Locked
+    setSelectedPackages(prev => 
+      prev.includes(pkg) ? prev.filter(p => p !== pkg) : [...prev, pkg]
+    );
+  };
+
   const toggleVOD = (vod: string) => {
     setSelectedVODs(prev => 
       prev.includes(vod) ? prev.filter(v => v !== vod) : [...prev, vod]
     );
   };
 
+  const filteredPackages = PACKAGE_LIST.filter(p => p.toLowerCase().includes(packageSearch.toLowerCase()));
   const filteredVODs = VOD_LIST.filter(v => v.toLowerCase().includes(vodSearch.toLowerCase()));
 
   return (
@@ -189,8 +81,8 @@ export function DeviceForm({ type, userData, setActiveTab }: DeviceFormProps) {
                   <label className="text-[10px] font-mono text-text-muted uppercase tracking-widest">Username / MAC</label>
                   <input 
                     type="text" 
-                    value={type === 'mag' ? macAddress : username}
-                    onChange={type === 'mag' ? handleMacChange : (e) => setUsername(e.target.value)}
+                    value={type === 'mag' ? macAddress : undefined}
+                    onChange={type === 'mag' ? handleMacChange : undefined}
                     placeholder={type === 'mag' ? '00:1A:79:XX:XX:XX' : 'Enter username'}
                     className="w-full bg-void/50 border border-white/10 rounded-xl px-4 py-3 text-white focus:border-cyan outline-none transition-all font-mono shadow-inner"
                   />
@@ -198,40 +90,19 @@ export function DeviceForm({ type, userData, setActiveTab }: DeviceFormProps) {
 
                 <div className="grid grid-cols-2 gap-4">
                   <div className="space-y-2">
-                    <label className="text-[10px] font-mono text-text-muted uppercase tracking-widest">Action Type</label>
-                    <div className="flex gap-2">
-                      {['NEW', 'RENEW', 'DEMO'].map((t) => (
-                        <button
-                          key={t}
-                          onClick={() => setSubType(t as any)}
-                          className={clsx(
-                            "flex-1 py-2 rounded-lg border text-[10px] font-bold uppercase transition-all",
-                            subType === t ? "bg-cyan/10 border-cyan text-cyan" : "border-white/10 text-text-muted hover:border-white/30"
-                          )}
-                        >
-                          {t}
-                        </button>
-                      ))}
-                    </div>
+                    <label className="text-[10px] font-mono text-text-muted uppercase tracking-widest">Subscription</label>
+                    <select className="w-full bg-void/50 border border-white/10 rounded-xl px-4 py-3 text-white focus:border-cyan outline-none transition-all text-xs">
+                      <option>All</option>
+                      <option>1 Month</option>
+                      <option>12 Months</option>
+                    </select>
                   </div>
                   <div className="space-y-2">
-                    <label className="text-[10px] font-mono text-text-muted uppercase tracking-widest">Duration</label>
-                    <select 
-                      value={duration}
-                      onChange={(e) => setDuration(e.target.value)}
-                      disabled={subType === 'DEMO'}
-                      className="w-full bg-void/50 border border-white/10 rounded-xl px-4 py-3 text-white focus:border-cyan outline-none transition-all text-xs disabled:opacity-50"
-                    >
-                      {subType === 'DEMO' ? (
-                        <option value="0">24H Trial (0 CR)</option>
-                      ) : (
-                        <>
-                          <option value="1">1 Month (1 CR)</option>
-                          <option value="3">3 Months (3 CR)</option>
-                          <option value="6">6 Months (6 CR)</option>
-                          <option value="12">12 Months (12 CR)</option>
-                        </>
-                      )}
+                    <label className="text-[10px] font-mono text-text-muted uppercase tracking-widest">Select Country</label>
+                    <select className="w-full bg-void/50 border border-white/10 rounded-xl px-4 py-3 text-white focus:border-cyan outline-none transition-all text-xs">
+                      <option>Select Country</option>
+                      <option>United Kingdom</option>
+                      <option>USA</option>
                     </select>
                   </div>
                 </div>
@@ -247,7 +118,7 @@ export function DeviceForm({ type, userData, setActiveTab }: DeviceFormProps) {
                     <div className="w-8 h-4 bg-orange-400/20 rounded-full relative cursor-pointer">
                       <div className="absolute right-1 top-1 w-2 h-2 bg-orange-400 rounded-full" />
                     </div>
-                    <span className="text-xs text-text-primary uppercase font-bold text-orange-400 italic">🎬 VOD VAULT</span>
+                    <span className="text-xs text-text-primary uppercase font-bold text-orange-400">VOD ONLY</span>
                   </div>
                 </div>
               </div>
@@ -263,113 +134,62 @@ export function DeviceForm({ type, userData, setActiveTab }: DeviceFormProps) {
             </div>
           </div>
 
-          {/* Package Selection Cards */}
-          <div className="space-y-6">
-            <h3 className="text-xl font-display font-bold text-white uppercase tracking-wider italic">Select Channel Package</h3>
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-              {/* PANDA SPECIAL */}
-              <div 
-                onClick={() => setSelectedPackage('PANDA SPECIAL')}
-                className={clsx(
-                  "glass-panel rounded-2xl p-6 border transition-all duration-500 cursor-pointer relative group overflow-hidden",
-                  selectedPackage === 'PANDA SPECIAL' ? "border-cyan shadow-[0_0_40px_rgba(0,245,255,0.4)] scale-[1.05] ring-2 ring-cyan/50" : "border-white/5 hover:border-white/20"
-                )}
-              >
-                {selectedPackage === 'PANDA SPECIAL' && (
-                  <>
-                    <div className="absolute top-0 right-0 w-32 h-32 bg-cyan/20 blur-3xl -mr-16 -mt-16 animate-pulse" />
-                    <div className="absolute inset-0 border-2 border-cyan/30 rounded-2xl animate-pulse pointer-events-none" />
-                  </>
-                )}
-                <div className="flex justify-between items-start mb-4 relative z-10">
-                  <h4 className="text-lg font-display font-black text-white tracking-tight">✦ PANDA SPECIAL</h4>
-                  <span className="bg-amber-500/20 text-amber-500 text-[8px] font-black px-2 py-1 rounded border border-amber-500/30 uppercase tracking-widest animate-bounce">DEFAULT</span>
-                </div>
-                <ul className="space-y-2 mb-6 relative z-10">
-                  <li className="text-[10px] text-text-muted flex items-center gap-2"><Zap className="w-3 h-3 text-cyan" /> ⚡ 18,000+ Live Channels</li>
-                  <li className="text-[10px] text-text-muted flex items-center gap-2"><Tv className="w-3 h-3 text-cyan" /> 4K / FHD / HD / SD Quality</li>
-                  <li className="text-[10px] text-text-muted flex items-center gap-2"><Layers className="w-3 h-3 text-cyan" /> 🎬 100,000+ VOD — Movies & Series</li>
-                  <li className="text-[10px] text-text-muted flex items-center gap-2"><Activity className="w-3 h-3 text-cyan" /> 🏆 Sports: NFL, NBA, UFC, PPV & more</li>
-                  <li className="text-[10px] text-text-muted flex items-center gap-2"><Globe className="w-3 h-3 text-cyan" /> 🌍 Multi-language: EN, FR, AR, ES & more</li>
-                  <li className="text-[10px] text-text-muted flex items-center gap-2"><Shield className="w-3 h-3 text-cyan" /> 🛡 99.9% Uptime SLA</li>
-                  <li className="text-[10px] text-text-muted flex items-center gap-2"><RefreshCw className="w-3 h-3 text-cyan" /> ❄ Anti-freeze buffer technology</li>
-                </ul>
-                <div className="pt-4 border-t border-white/5 flex items-center justify-between relative z-10">
-                  <div className="flex flex-col">
-                    <span className="text-[9px] font-mono text-cyan uppercase font-bold">Premium Package</span>
-                    <span className="text-[11px] font-black text-white">1 CREDIT</span>
-                  </div>
-                  <div className="flex items-center gap-2" onClick={(e) => e.stopPropagation()}>
-                    <span className="text-[8px] font-mono text-text-muted uppercase">🔞 Adult</span>
-                    <button 
-                      onClick={() => setAdultEnabled(!adultEnabled)}
-                      className={clsx(
-                        "w-8 h-4 rounded-full relative transition-all",
-                        adultEnabled ? "bg-cyan shadow-[0_0_10px_#00f5ff]" : "bg-white/10"
-                      )}
-                    >
-                      <div className={clsx(
-                        "absolute top-1 w-2 h-2 rounded-full bg-white transition-all",
-                        adultEnabled ? "right-1" : "left-1"
-                      )} />
-                    </button>
-                  </div>
-                </div>
-              </div>
-
-              {/* INFINITY STREAM */}
-              <div 
-                onClick={() => setSelectedPackage('INFINITY STREAM')}
-                className={clsx(
-                  "glass-panel rounded-2xl p-6 border transition-all duration-500 cursor-pointer relative group overflow-hidden",
-                  selectedPackage === 'INFINITY STREAM' ? "border-blue-500 shadow-[0_0_30px_rgba(59,130,246,0.2)] scale-[1.02]" : "border-white/5 hover:border-white/20"
-                )}
-              >
-                <div className="flex justify-between items-start mb-4 relative z-10">
-                  <h4 className="text-lg font-display font-black text-white tracking-tight">⚡ INFINITY STREAM</h4>
-                  <span className="bg-blue-500/20 text-blue-500 text-[8px] font-black px-2 py-1 rounded border border-blue-500/30 uppercase tracking-widest">Popular</span>
-                </div>
-                <ul className="space-y-2 mb-6 relative z-10">
-                  <li className="text-[10px] text-text-muted flex items-center gap-2"><Tv className="w-3 h-3 text-blue-500" /> 📺 Premium channels + VOD</li>
-                  <li className="text-[10px] text-text-muted flex items-center gap-2"><Zap className="w-3 h-3 text-blue-500" /> HD/FHD quality</li>
-                  <li className="text-[10px] text-text-muted flex items-center gap-2"><Activity className="w-3 h-3 text-blue-500" /> 🏅 Sports package</li>
-                  <li className="text-[10px] text-text-muted flex items-center gap-2"><Globe className="w-3 h-3 text-blue-500" /> 🌐 Multi-language</li>
-                </ul>
-                <div className="pt-4 border-t border-white/5 relative z-10">
-                  <span className="text-[9px] font-mono text-blue-500 uppercase font-bold">Standard Package</span>
-                  <div className="text-[11px] font-black text-white">1 CREDIT</div>
-                </div>
-              </div>
-
-              {/* ULTRA PRIME */}
-              <div 
-                onClick={() => setSelectedPackage('ULTRA PRIME')}
-                className={clsx(
-                  "glass-panel rounded-2xl p-6 border transition-all duration-500 cursor-pointer relative group overflow-hidden",
-                  selectedPackage === 'ULTRA PRIME' ? "border-purple-500 shadow-[0_0_30px_rgba(168,85,247,0.2)] scale-[1.02]" : "border-white/5 hover:border-white/20"
-                )}
-              >
-                <div className="flex justify-between items-start mb-4 relative z-10">
-                  <h4 className="text-lg font-display font-black text-white tracking-tight">👑 ULTRA PRIME</h4>
-                  <span className="bg-purple-500/20 text-purple-500 text-[8px] font-black px-2 py-1 rounded border border-purple-500/30 uppercase tracking-widest">Elite</span>
-                </div>
-                <ul className="space-y-2 mb-6 relative z-10">
-                  <li className="text-[10px] text-text-muted flex items-center gap-2"><Globe className="w-3 h-3 text-purple-500" /> 🌐 All channels</li>
-                  <li className="text-[10px] text-text-muted flex items-center gap-2"><Tv className="w-3 h-3 text-purple-500" /> 🎞 4K Ultra HD</li>
-                  <li className="text-[10px] text-text-muted flex items-center gap-2"><Activity className="w-3 h-3 text-purple-500" /> 👑 Complete sports + PPV</li>
-                  <li className="text-[10px] text-text-muted flex items-center gap-2"><Globe className="w-3 h-3 text-purple-500" /> 🌍 All languages</li>
-                  <li className="text-[10px] text-text-muted flex items-center gap-2"><Shield className="w-3 h-3 text-purple-500" /> 🛡 Premium support</li>
-                </ul>
-                <div className="pt-4 border-t border-white/5 relative z-10">
-                  <span className="text-[9px] font-mono text-purple-500 uppercase font-bold">Elite Package</span>
-                  <div className="text-[11px] font-black text-white">1 CREDIT</div>
-                </div>
-              </div>
+          {/* Sort Packages Pills */}
+          <div className="space-y-4">
+            <h3 className="text-sm font-display font-bold text-white uppercase tracking-widest">Sort Packages</h3>
+            <div className="flex gap-4">
+              <button className="px-8 py-2 rounded-lg bg-violet/20 text-violet border border-violet/40 text-xs font-bold shadow-[0_0_15px_rgba(139,0,255,0.2)]">Europe</button>
+              <button className="px-8 py-2 rounded-lg bg-cyan/10 text-cyan border border-cyan/40 text-xs font-bold">Middle East</button>
+              <button className="px-8 py-2 rounded-lg bg-cyan/10 text-cyan border border-cyan/40 text-xs font-bold">US</button>
             </div>
           </div>
 
-          {/* VOD Selection Columns */}
-          <div className="grid grid-cols-1 gap-8">
+          {/* Package & VOD Selection Columns */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+            {/* Packages */}
+            <div className="glass-panel rounded-2xl p-6 border-cyan/10 space-y-4">
+              <div className="flex items-center justify-between border-b border-white/5 pb-4">
+                <h3 className="text-lg font-display font-bold text-white uppercase tracking-wider">Select Package</h3>
+                <div className="flex gap-2">
+                  <button className="px-3 py-1 rounded bg-violet/20 text-violet text-[10px] font-bold">All</button>
+                  <select className="bg-void border border-white/10 rounded px-2 py-1 text-[10px] text-text-muted outline-none">
+                    <option>No Adult</option>
+                  </select>
+                </div>
+              </div>
+              <button className="w-full py-2 bg-white/5 rounded-lg text-xs text-text-muted hover:text-white transition-all border border-white/5">Select All</button>
+              <div className="space-y-1 max-h-[400px] overflow-y-auto custom-scrollbar pr-2">
+                {filteredPackages.map(pkg => {
+                  const isPandaSpecial = PANDA_SPECIAL_PACKAGES.includes(pkg);
+                  return (
+                    <div 
+                      key={pkg} 
+                      className={clsx(
+                        "flex items-center gap-3 p-2 rounded-lg transition-all group cursor-pointer",
+                        isPandaSpecial ? "bg-white/5 opacity-60 cursor-not-allowed" : "hover:bg-white/5"
+                      )} 
+                      onClick={() => togglePackage(pkg)}
+                    >
+                      <div className={clsx(
+                        "w-4 h-4 rounded border flex items-center justify-center transition-all",
+                        selectedPackages.includes(pkg) ? "bg-cyan border-cyan" : "border-white/20 group-hover:border-white/40",
+                        isPandaSpecial && "bg-white/20 border-white/10"
+                      )}>
+                        {selectedPackages.includes(pkg) && <CheckSquare className={clsx("w-3 h-3", isPandaSpecial ? "text-text-muted" : "text-void")} />}
+                      </div>
+                      <div className="flex-1 flex items-center justify-between">
+                        <span className={clsx("text-xs transition-colors", selectedPackages.includes(pkg) ? (isPandaSpecial ? "text-text-muted" : "text-cyan font-bold") : "text-text-muted group-hover:text-white")}>{pkg}</span>
+                        {isPandaSpecial && (
+                          <span className="text-[8px] font-black text-text-muted uppercase tracking-tighter border border-white/10 px-1 rounded">Panda Special (Locked)</span>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+
+            {/* VODs */}
             <div className="glass-panel rounded-2xl p-6 border-cyan/10 space-y-4">
               <div className="flex items-center justify-between border-b border-white/5 pb-4">
                 <h3 className="text-lg font-display font-bold text-white uppercase tracking-wider">Select VOD</h3>
@@ -400,20 +220,12 @@ export function DeviceForm({ type, userData, setActiveTab }: DeviceFormProps) {
 
         {/* Sidebar KPIs */}
         <div className="lg:col-span-3 space-y-6">
-          {error && (
-            <div className="p-4 bg-red/10 border border-red/20 rounded-xl text-red text-xs font-mono uppercase tracking-wider animate-pulse">
-              {error}
-            </div>
-          )}
-          {success && (
-            <div className="p-4 bg-green/10 border border-green/20 rounded-xl text-green text-xs font-mono uppercase tracking-wider">
-              {success}
-            </div>
-          )}
           <div className="space-y-4">
             {[
-              { label: 'Balance', value: `${userData?.credits || 0}`, icon: Wallet, color: 'text-green', bg: 'bg-green/10', border: 'border-green/30' },
-              { label: 'Cost', value: `${subscriptionCost}`, icon: DollarSign, color: 'text-orange-400', bg: 'bg-orange-400/10', border: 'border-orange-400/30' },
+              { label: 'Balance', value: '91.0', icon: Wallet, color: 'text-green', bg: 'bg-green/10', border: 'border-green/30' },
+              { label: 'Remaining Demo', value: '147', icon: RefreshCw, color: 'text-cyan', bg: 'bg-cyan/10', border: 'border-cyan/30' },
+              { label: 'Expire', value: 'Expire', icon: Clock, color: 'text-orange-400', bg: 'bg-orange-400/10', border: 'border-orange-400/30' },
+              { label: 'Price', value: 'Price', icon: DollarSign, color: 'text-orange-400', bg: 'bg-orange-400/10', border: 'border-orange-400/30' },
             ].map((kpi, i) => (
               <div key={i} className="glass-panel p-6 rounded-2xl border-white/5 flex items-center justify-between group hover:border-white/20 transition-all">
                 <div>
@@ -427,13 +239,9 @@ export function DeviceForm({ type, userData, setActiveTab }: DeviceFormProps) {
             ))}
           </div>
 
-          <button 
-            onClick={handleConfirm}
-            disabled={loading}
-            className="w-full py-6 rounded-2xl bg-gradient-to-r from-cyan to-violet text-void font-black text-xl uppercase tracking-[0.2em] shadow-[0_0_30px_rgba(0,245,255,0.4)] hover:scale-[1.02] transition-all relative overflow-hidden group disabled:opacity-50 disabled:cursor-not-allowed"
-          >
+          <button className="w-full py-6 rounded-2xl bg-gradient-to-r from-cyan to-violet text-void font-black text-xl uppercase tracking-[0.2em] shadow-[0_0_30px_rgba(0,245,255,0.4)] hover:scale-[1.02] transition-all relative overflow-hidden group">
             <div className="absolute inset-0 bg-white/20 translate-x-[-100%] group-hover:translate-x-[100%] transition-transform duration-700 skew-x-12" />
-            {loading ? <Loader2 className="w-8 h-8 animate-spin mx-auto" /> : 'Confirm'}
+            Confirm
           </button>
 
           <div className="pt-8 flex flex-col items-center">

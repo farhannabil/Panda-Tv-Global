@@ -1,19 +1,14 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { 
   Search, Filter, MoreVertical, Edit2, Info, 
   RefreshCw, Trash2, Shield, Upload, Move, 
   RotateCcw, Ban, CheckCircle2, XCircle, Activity, Power,
-  AlertTriangle, Zap, Bell, CheckSquare, Square, MousePointer2, Layers, Copy, Eye, EyeOff, Plus
+  AlertTriangle, Zap, Bell, CheckSquare, Square, MousePointer2, Layers
 } from 'lucide-react';
 import { clsx } from 'clsx';
-import { collection, query, where, onSnapshot } from 'firebase/firestore';
-import { db, isFirebaseConfigured, isDbReady } from '../lib/firebase';
-import { QuickAddModal } from './QuickAddModal';
 
 interface CustomersProps {
   type?: 'mag' | 'm3u';
-  userData: any;
-  setActiveTab: (tab: string) => void;
 }
 
 const mockUsers = Array.from({ length: 12 }).map((_, i) => ({
@@ -35,91 +30,16 @@ const mockUsers = Array.from({ length: 12 }).map((_, i) => ({
   ip: `192.168.1.${10 + i}`
 }));
 
-export function Customers({ type = 'mag', userData, setActiveTab }: CustomersProps) {
+export function Customers({ type = 'mag' }: CustomersProps) {
   const [activeDropdown, setActiveDropdown] = useState<string | null>(null);
   const [selectedUsers, setSelectedUsers] = useState<string[]>([]);
   const [hoveredUser, setHoveredUser] = useState<string | null>(null);
-  const [lines, setLines] = useState<any[]>([]);
-  const [search, setSearch] = useState('');
-  const [visiblePasswords, setVisiblePasswords] = useState<Set<string>>(new Set(['all'])); // Show all by default
-  const [copiedField, setCopiedField] = useState<{id: string, field: string} | null>(null);
-  const [showQuickAdd, setShowQuickAdd] = useState(false);
-
-  const isAdmin = userData?.role === 'ADMIN';
-
-  // Toggle password visibility for a specific user
-  const togglePassword = (id: string) => {
-    setVisiblePasswords(prev => {
-      const newSet = new Set(prev);
-      if (newSet.has('all')) {
-        // If all are visible, hide this one
-        newSet.delete('all');
-        newSet.add(id);
-      } else if (newSet.has(id)) {
-        // If this one is visible, check if it's the only one
-        newSet.delete(id);
-      } else {
-        newSet.add(id);
-      }
-      return newSet;
-    });
-  };
-
-  // Copy to clipboard
-  const copyToClipboard = (id: string, value: string, field: string) => {
-    navigator.clipboard.writeText(value);
-    setCopiedField({ id, field });
-    setTimeout(() => setCopiedField(null), 2000);
-  };
-
-  useEffect(() => {
-    // Check if we're in demo mode
-    const isDemo = typeof window !== 'undefined' && 
-      new URLSearchParams(window.location.search).get('demo') === 'true';
-    
-    // Use mock data when db is not configured or in demo mode
-    if (isDemo || !isDbReady() || !userData) {
-      // Use mock data for demo mode
-      setLines(mockUsers.map((u, i) => ({
-        id: u.id,
-        identifier: u.username,
-        password: u.password,
-        expireDate: u.expire,
-        status: u.status === 'Active' ? 'active' : u.status.toLowerCase(),
-        online: u.online,
-        type: type,
-        package: u.package,
-        notes: u.notes,
-      })));
-      return;
-    }
-
-    const linesRef = collection(db, 'lines');
-    const q = isAdmin
-      ? query(linesRef, where('type', '==', type))
-      : query(linesRef, where('type', '==', type), where('resellerUid', '==', userData.uid));
-
-    const unsubscribe = onSnapshot(q, (snapshot) => {
-      const linesData = snapshot.docs.map(doc => ({
-        id: doc.id,
-        ...doc.data(),
-        status: new Date(doc.data().expireDate) > new Date() ? 'active' : 'expired'
-      }));
-      setLines(linesData);
-    });
-
-    return () => unsubscribe();
-  }, [userData, type, isAdmin]);
-
-  const filteredLines = lines.filter(l => 
-    l.identifier?.toLowerCase().includes(search.toLowerCase())
-  );
 
   const toggleSelectAll = () => {
-    if (selectedUsers.length === filteredLines.length) {
+    if (selectedUsers.length === mockUsers.length) {
       setSelectedUsers([]);
     } else {
-      setSelectedUsers(filteredLines.map(u => u.id));
+      setSelectedUsers(mockUsers.map(u => u.id));
     }
   };
 
@@ -165,20 +85,8 @@ export function Customers({ type = 'mag', userData, setActiveTab }: CustomersPro
           )}
           <div className="relative flex-1 lg:w-64">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-text-muted" />
-            <input 
-              type="text" 
-              placeholder="Search users..." 
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              className="w-full bg-void border border-white/10 rounded-lg pl-10 pr-4 py-2 text-white focus:border-cyan-400 outline-none transition-all" 
-            />
+            <input type="text" placeholder="Search users..." className="w-full bg-void border border-white/10 rounded-lg pl-10 pr-4 py-2 text-white focus:border-cyan-400 outline-none transition-all" />
           </div>
-          <button 
-            onClick={() => setShowQuickAdd(true)}
-            className="px-4 py-2 bg-cyan-500/20 border border-cyan-500/50 rounded-lg text-cyan-400 hover:bg-cyan-500/30 transition-all flex items-center gap-2"
-          >
-            <Plus className="w-4 h-4" /> Quick Add
-          </button>
           <button className="px-4 py-2 bg-white/5 border border-white/10 rounded-lg text-white hover:bg-white/10 transition-all flex items-center gap-2">
             <Filter className="w-4 h-4" /> Filter
           </button>
@@ -187,10 +95,10 @@ export function Customers({ type = 'mag', userData, setActiveTab }: CustomersPro
 
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-4">
         {[
-          { label: 'Total Users', value: `${lines.length}`, color: 'text-cyan-400', bg: 'bg-cyan-400/10' },
-          { label: 'Online', value: '0', color: 'text-emerald-400', bg: 'bg-emerald-400/10' },
-          { label: 'Expired', value: `${lines.filter(l => l.status === 'Expired').length}`, color: 'text-red-400', bg: 'bg-red-400/10' },
-          { label: 'Disabled', value: '0', color: 'text-orange-400', bg: 'bg-orange-400/10' },
+          { label: 'Total Users', value: '376', color: 'text-cyan-400', bg: 'bg-cyan-400/10' },
+          { label: 'Online', value: '5', color: 'text-emerald-400', bg: 'bg-emerald-400/10' },
+          { label: 'Expired', value: '216', color: 'text-red-400', bg: 'bg-red-400/10' },
+          { label: 'Disabled', value: '12', color: 'text-orange-400', bg: 'bg-orange-400/10' },
         ].map((stat, i) => (
           <div key={i} className="glass-panel p-4 rounded-xl border-white/5 flex items-center justify-between">
             <div>
@@ -211,96 +119,100 @@ export function Customers({ type = 'mag', userData, setActiveTab }: CustomersPro
               <tr className="border-b border-border-glow bg-white/5">
                 <th className="px-4 py-4 w-10">
                   <button onClick={toggleSelectAll} className="text-text-muted hover:text-white transition-colors">
-                    {selectedUsers.length === filteredLines.length ? <CheckSquare className="w-4 h-4 text-cyan-400" /> : <Square className="w-4 h-4" />}
+                    {selectedUsers.length === mockUsers.length ? <CheckSquare className="w-4 h-4 text-cyan-400" /> : <Square className="w-4 h-4" />}
                   </button>
                 </th>
                 <th className="px-6 py-4 text-[10px] font-mono text-text-muted uppercase tracking-widest font-semibold">Status</th>
                 <th className="px-6 py-4 text-[10px] font-mono text-text-muted uppercase tracking-widest font-semibold">Username</th>
                 <th className="px-6 py-4 text-[10px] font-mono text-text-muted uppercase tracking-widest font-semibold">Password</th>
                 <th className="px-6 py-4 text-[10px] font-mono text-text-muted uppercase tracking-widest font-semibold">Expire</th>
-                {isAdmin && <th className="px-6 py-4 text-[10px] font-mono text-text-muted uppercase tracking-widest font-semibold">Reseller</th>}
+                <th className="px-6 py-4 text-[10px] font-mono text-text-muted uppercase tracking-widest font-semibold">Reseller</th>
                 <th className="px-6 py-4 text-[10px] font-mono text-text-muted uppercase tracking-widest font-semibold">Online</th>
                 <th className="px-6 py-4 text-[10px] font-mono text-text-muted uppercase tracking-widest font-semibold text-center">Action</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-white/5 relative">
-              {filteredLines.map((line) => (
-                <tr key={line.id} className={clsx(
+              {mockUsers.map((user) => (
+                <tr key={user.id} className={clsx(
                   "group transition-all duration-200",
-                  selectedUsers.includes(line.id) ? "bg-cyan-400/5" : "hover:bg-white/[0.04]"
+                  selectedUsers.includes(user.id) ? "bg-cyan-400/5" : "hover:bg-white/[0.04]"
                 )}>
                   <td className="px-4 py-4">
-                    <button onClick={() => toggleSelectUser(line.id)} className="text-text-muted hover:text-white transition-colors">
-                      {selectedUsers.includes(line.id) ? <CheckSquare className="w-4 h-4 text-cyan-400" /> : <Square className="w-4 h-4" />}
+                    <button onClick={() => toggleSelectUser(user.id)} className="text-text-muted hover:text-white transition-colors">
+                      {selectedUsers.includes(user.id) ? <CheckSquare className="w-4 h-4 text-cyan-400" /> : <Square className="w-4 h-4" />}
                     </button>
                   </td>
                   <td className="px-6 py-4">
                     <div className="flex items-center gap-2">
                       <span className={clsx(
                         "inline-flex items-center px-2 py-0.5 rounded-full text-[8px] font-mono font-bold uppercase tracking-wider border",
-                        line.status === 'active' ? "bg-emerald-400/10 text-emerald-400 border-emerald-400/30" :
-                        line.status === 'expired' ? "bg-red-400/10 text-red-400 border-red-400/30" :
-                        line.status === 'suspended' ? "bg-orange-400/10 text-orange-400 border-orange-400/30" :
-                        "bg-gray-400/10 text-gray-400 border-gray-400/30"
+                        user.status === 'Active' ? "bg-cyan-400/10 text-cyan-400 border-cyan-400/30" :
+                        user.status === 'Suspended' ? "bg-orange-400/10 text-orange-400 border-orange-400/30" :
+                        "bg-pink-400/10 text-pink-400 border-pink-400/30"
                       )}>
-                        {line.status}
+                        {user.status}
                       </span>
+                      {user.isVpn && (
+                        <div className="group/vpn relative">
+                          <AlertTriangle className="w-3 h-3 text-red-500 animate-pulse" />
+                          <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-32 p-2 bg-red-500 text-white text-[8px] rounded opacity-0 group-hover/vpn:opacity-100 transition-opacity pointer-events-none z-50 font-bold uppercase tracking-tighter text-center">
+                            VPN/Proxy Detected!
+                          </div>
+                        </div>
+                      )}
                     </div>
                   </td>
                   <td className="px-6 py-4">
                     <div className="flex flex-col">
-                      <span className="font-mono text-xs text-white font-bold">{line.identifier}</span>
+                      <span className="font-mono text-xs text-white font-bold">{user.username}</span>
+                      <span className="text-[8px] font-mono text-text-muted uppercase tracking-tighter">{user.ip}</span>
                     </div>
                   </td>
+                  <td className="px-6 py-4 font-mono text-[10px] text-text-muted">********</td>
+                  <td className="px-6 py-4 text-xs text-white font-mono">{user.expire}</td>
+                  <td className="px-6 py-4 text-xs text-text-muted uppercase tracking-wider">{user.reseller}</td>
                   <td className="px-6 py-4">
-                    <div className="flex items-center gap-2">
-                      <div className="flex flex-col gap-0.5">
-                        <span className="font-mono text-[9px] text-cyan-400 uppercase tracking-wider">ID: {line.id}</span>
-                        <div className="flex items-center gap-1">
-                          <span className="font-mono text-xs text-white">
-                            {visiblePasswords.has('all') || visiblePasswords.has(line.id) ? line.password : '••••••••'}
-                          </span>
-                          <button
-                            onClick={() => togglePassword(line.id)}
-                            className="p-1 hover:bg-white/10 rounded transition-colors"
-                          >
-                            {visiblePasswords.has('all') || visiblePasswords.has(line.id) ? 
-                              <EyeOff className="w-3 h-3 text-text-muted" /> : 
-                              <Eye className="w-3 h-3 text-text-muted" />
-                            }
-                          </button>
-                          <button
-                            onClick={() => copyToClipboard(line.id, line.password, 'password')}
-                            className="p-1 hover:bg-white/10 rounded transition-colors"
-                          >
-                            {copiedField?.id === line.id && copiedField?.field === 'password' ? 
-                              <CheckSquare className="w-3 h-3 text-emerald-400" /> : 
-                              <Copy className="w-3 h-3 text-cyan-400" />
-                            }
-                          </button>
+                    <div 
+                      className="flex items-center gap-2 cursor-help relative group/signal"
+                      onMouseEnter={() => setHoveredUser(user.id)}
+                      onMouseLeave={() => setHoveredUser(null)}
+                    >
+                      <div className={clsx("w-1.5 h-1.5 rounded-full", user.online ? "bg-emerald-400 shadow-[0_0_8px_rgba(52,211,153,0.8)]" : "bg-white/20")} />
+                      <span className="text-[10px] font-mono text-text-muted uppercase">{user.online ? 'Online' : 'Offline'}</span>
+                      
+                      {user.online && hoveredUser === user.id && (
+                        <div className="absolute bottom-full left-0 mb-2 w-48 glass-panel p-3 rounded-xl border-cyan-400/30 shadow-2xl z-50 animate-in fade-in slide-in-from-bottom-2 duration-200">
+                          <div className="space-y-2">
+                            <div className="flex justify-between items-center">
+                              <span className="text-[8px] font-mono text-text-muted uppercase">Bitrate</span>
+                              <span className="text-[10px] font-mono text-cyan-400 font-bold">{user.bitrate}</span>
+                            </div>
+                            <div className="flex justify-between items-center">
+                              <span className="text-[8px] font-mono text-text-muted uppercase">ISP</span>
+                              <span className="text-[10px] font-mono text-white font-bold">{user.isp}</span>
+                            </div>
+                            <div className="h-1 bg-white/5 rounded-full overflow-hidden">
+                              <div className="h-full bg-cyan-400 w-3/4 shadow-[0_0_10px_rgba(0,245,255,0.5)]" />
+                            </div>
+                          </div>
                         </div>
-                      </div>
-                    </div>
-                  </td>
-                  <td className="px-6 py-4 text-xs text-white font-mono">{line.expireDate?.split('T')[0]}</td>
-                  {isAdmin && <td className="px-6 py-4 text-xs text-text-muted uppercase tracking-wider">{line.resellerUid?.slice(0, 8)}...</td>}
-                  <td className="px-6 py-4">
-                    <div className="flex items-center gap-2">
-                      <div className={clsx("w-1.5 h-1.5 rounded-full bg-white/20")} />
-                      <span className="text-[10px] font-mono text-text-muted uppercase">Offline</span>
+                      )}
                     </div>
                   </td>
                   <td className="px-6 py-4 text-center relative">
                     <div className="flex items-center justify-center gap-1">
+                      <button className="p-1.5 rounded bg-pink-400/10 text-pink-400 hover:bg-pink-400/20 transition-all border border-pink-400/20" title="Reset ISP Lock">
+                        <Shield className="w-3 h-3" />
+                      </button>
                       <button 
-                        onClick={() => setActiveDropdown(activeDropdown === line.id ? null : line.id)}
+                        onClick={() => setActiveDropdown(activeDropdown === user.id ? null : user.id)}
                         className="p-1.5 rounded-lg hover:bg-white/10 transition-all text-text-muted hover:text-white"
                       >
                         <MoreVertical className="w-4 h-4" />
                       </button>
                     </div>
 
-                    {activeDropdown === line.id && (
+                    {activeDropdown === user.id && (
                       <>
                         <div className="fixed inset-0 z-30" onClick={() => setActiveDropdown(null)} />
                         <div className="absolute right-6 top-12 w-48 glass-panel rounded-xl border-white/10 shadow-2xl z-40 py-2 overflow-hidden animate-in fade-in zoom-in-95 duration-200">
@@ -325,32 +237,17 @@ export function Customers({ type = 'mag', userData, setActiveTab }: CustomersPro
         </div>
         
         <div className="border-t border-border-glow p-4 flex items-center justify-between bg-white/5">
-          <p className="text-[10px] font-mono text-text-muted uppercase tracking-widest">
-            Showing {filteredLines.length > 0 ? 1 : 0} to {Math.min(12, filteredLines.length)} of {filteredLines.length} entries
-          </p>
+          <p className="text-[10px] font-mono text-text-muted uppercase tracking-widest">Showing 1 to 12 of 369 entries</p>
           <div className="flex items-center gap-2">
             <button className="px-3 py-1 rounded border border-white/10 text-[10px] font-mono text-text-muted hover:bg-white/5 hover:text-white transition-colors uppercase">Prev</button>
             <button className="px-3 py-1 rounded bg-cyan-400/20 border border-cyan-400/50 text-[10px] font-mono text-cyan-400 font-bold shadow-[0_0_10px_rgba(0,245,255,0.3)]">1</button>
-            {filteredLines.length > 12 && (
-              <button className="px-3 py-1 rounded border border-white/10 text-[10px] font-mono text-text-muted hover:bg-white/5 hover:text-white transition-colors">2</button>
-            )}
-            {filteredLines.length > 24 && (
-              <>
-                <span className="text-text-muted px-1 text-[10px]">...</span>
-                <button className="px-3 py-1 rounded border border-white/10 text-[10px] font-mono text-text-muted hover:bg-white/5 hover:text-white transition-colors uppercase">Next</button>
-              </>
-            )}
+            <button className="px-3 py-1 rounded border border-white/10 text-[10px] font-mono text-text-muted hover:bg-white/5 hover:text-white transition-colors">2</button>
+            <button className="px-3 py-1 rounded border border-white/10 text-[10px] font-mono text-text-muted hover:bg-white/5 hover:text-white transition-colors">3</button>
+            <span className="text-text-muted px-1 text-[10px]">...</span>
+            <button className="px-3 py-1 rounded border border-white/10 text-[10px] font-mono text-text-muted hover:bg-white/5 hover:text-white transition-colors uppercase">Next</button>
           </div>
         </div>
       </div>
-
-      {/* Quick Add Modal */}
-      <QuickAddModal 
-        isOpen={showQuickAdd} 
-        onClose={() => setShowQuickAdd(false)} 
-        type={type}
-        userData={userData}
-      />
     </div>
   );
 }

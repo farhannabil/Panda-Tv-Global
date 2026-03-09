@@ -9,17 +9,10 @@ import {
   Newspaper, Clock, TrendingUp, Zap, Shield, Target,
   UserPlus, Ticket, DollarSign, PlusCircle, Send, Info,
   Bell, Settings, Calculator, BarChart3, Gauge, ArrowUpRight,
-  Cpu, Database, Network, Megaphone, MessageSquare
+  Cpu, Database, Network
 } from 'lucide-react';
 import { clsx } from 'clsx';
 import { ResellerFeed } from './ResellerFeed';
-import { AITools } from './AITools';
-
-import { 
-  collection, query, where, getDocs, onSnapshot, doc
-} from 'firebase/firestore';
-import { db } from '../lib/firebase';
-import { iptvService } from '../services/iptvService';
 
 const subscriptionData = [
   { name: 'Nov', new: 150, renew: 80, demo: 40 },
@@ -43,6 +36,14 @@ const kpis = [
   { title: 'Expires Tomorrow', value: '3', icon: AlertTriangle, color: 'text-pink-400', bg: 'bg-pink-400/10', border: 'border-pink-400/30', glow: 'glow-border-pink' },
 ];
 
+const actionButtons = [
+  { label: 'Add Subseller', icon: UserPlus, color: 'bg-green-500/20 text-green-400 border-green-500/30' },
+  { label: 'My Store Tickets', icon: Ticket, color: 'bg-pink-500/20 text-pink-400 border-pink-500/30' },
+  { label: 'Request Credit', icon: DollarSign, color: 'bg-yellow-500/20 text-yellow-400 border-yellow-500/30' },
+  { label: 'Quick Add New', icon: PlusCircle, color: 'bg-cyan-500/20 text-cyan-400 border-cyan-500/30' },
+  { label: 'Telegram Support', icon: Send, color: 'bg-blue-500/20 text-blue-400 border-blue-500/30' },
+  { label: 'Latest Updates', icon: Info, color: 'bg-purple-500/20 text-purple-400 border-purple-500/30' },
+];
 
 const todayLogs = [
   { id: 1, system: 'M3U', mac: 'ee8a9d2a30', expire: '2026-05-31', reseller: 'codexcipher', type: 'New', amount: '3.0' },
@@ -52,137 +53,8 @@ const todayLogs = [
   { id: 5, system: 'M3U', mac: '2e100f6d13', expire: '2026-02-28', reseller: 'codexcipher', type: 'Demo', amount: '0.0' },
 ];
 
-export function Dashboard({ userData, setActiveTab }: { userData: any, setActiveTab: (tab: string) => void }) {
-  const isAdmin = userData?.role === 'ADMIN';
-  const isReseller = userData?.role === 'RESELLER';
-
-  const actionButtons = [
-    ...(isAdmin ? [
-      { label: 'Admin Settings', icon: Settings, color: 'bg-cyan-500/20 text-cyan-400 border-cyan-500/30', tab: 'admin-settings' },
-      { label: 'Manage Resellers', icon: Users, color: 'bg-violet-500/20 text-violet-400 border-violet-500/30', tab: 'admin-resellers' },
-      { label: 'Broadcast', icon: Megaphone, color: 'bg-pink-500/20 text-pink-400 border-pink-500/30', tab: 'admin-announcements' },
-    ] : [
-      { label: 'Add MAG', icon: PlusCircle, color: 'bg-cyan-500/20 text-cyan-400 border-cyan-500/30', tab: 'mag-add' },
-      { label: 'Add M3U', icon: PlusCircle, color: 'bg-violet-500/20 text-violet-400 border-violet-500/30', tab: 'm3u-add' },
-      { label: 'Support Chat', icon: MessageSquare, color: 'bg-emerald-500/20 text-emerald-400 border-emerald-500/30', tab: 'support-chat' },
-    ]),
-    { label: 'Latest Updates', icon: Info, color: 'bg-purple-500/20 text-purple-400 border-purple-500/30', tab: 'tools-updates' },
-  ];
+export function Dashboard() {
   const [realtimeData, setRealtimeData] = useState<{time: string, load: number}[]>([]);
-  const [logs, setLogs] = useState<any[]>([]);
-  const [stats, setStats] = useState({
-    totalSubs: 0,
-    online: 0,
-    expiresSoon: 0,
-    totalResellers: 0,
-    apiCredits: '0',
-    activeLines: 0
-  });
-
-  useEffect(() => {
-    if (!userData || !db) return;
-
-    // 1. Fetch Stats from Firestore
-    const linesRef = collection(db, 'lines');
-    const q = isAdmin 
-      ? query(linesRef) 
-      : query(linesRef, where('userId', '==', userData.uid));
-
-    const unsubscribe = onSnapshot(q, (snapshot) => {
-      const now = new Date();
-      const tomorrow = new Date(now.getTime() + 24 * 60 * 60 * 1000);
-      
-      let soon = 0;
-      let active = 0;
-      snapshot.docs.forEach(doc => {
-        const data = doc.data();
-        const expire = new Date(data.expireDate);
-        if (expire > now && expire <= tomorrow) soon++;
-        if (data.status === 'active' || data.status === 'ACTIVE') active++;
-      });
-
-      setStats(prev => ({
-        ...prev,
-        totalSubs: snapshot.size,
-        expiresSoon: soon,
-        activeLines: active
-      }));
-    });
-
-    // 2. If Admin, fetch Reseller count and API balance
-    if (isAdmin) {
-      const usersRef = collection(db, 'users');
-      const resellersQ = query(usersRef, where('role', '==', 'RESELLER'));
-      const unsubscribeResellers = onSnapshot(resellersQ, (snap) => {
-        setStats(prev => ({ ...prev, totalResellers: snap.size }));
-      });
-
-      iptvService.getResellerInfo().then(info => {
-        if (info.status === 'true') {
-          setStats(prev => ({ ...prev, apiCredits: info.credits || '0' }));
-        }
-      });
-    }
-
-    // 3. Fetch Logs
-    const logsRef = collection(db, 'logs');
-    const logsQ = isAdmin
-      ? query(logsRef)
-      : query(logsRef, where('userId', '==', userData.uid));
-
-    const unsubscribeLogs = onSnapshot(logsQ, (snapshot) => {
-      const logsData = snapshot.docs.map(doc => ({
-        id: doc.id,
-        ...doc.data(),
-        timestamp: doc.data().timestamp || 'Recent'
-      })).sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime()).slice(0, 5);
-      setLogs(logsData);
-    });
-
-    return () => {
-      unsubscribe();
-      unsubscribeLogs();
-    };
-  }, [userData, isAdmin]);
-
-  const dynamicKpis = [
-    { 
-      title: isAdmin ? 'API Master Credits' : 'Credit Liquidity', 
-      value: isAdmin ? stats.apiCredits : `${userData?.credits || 0}`, 
-      icon: Wallet, 
-      color: 'text-emerald-400', 
-      bg: 'bg-emerald-400/10', 
-      border: 'border-emerald-400/30', 
-      glow: 'glow-border-cyan' 
-    },
-    { 
-      title: isAdmin ? 'Total Resellers' : 'Total Subscriptions', 
-      value: isAdmin ? `${stats.totalResellers}` : `${stats.totalSubs}`, 
-      icon: Users, 
-      color: 'text-orange-400', 
-      bg: 'bg-orange-400/10', 
-      border: 'border-orange-400/30', 
-      glow: 'glow-border-orange' 
-    },
-    { 
-      title: isAdmin ? 'Total Lines' : 'Active Lines', 
-      value: `${stats.totalSubs}`, 
-      icon: Tv, 
-      color: 'text-cyan-400', 
-      bg: 'bg-cyan-400/10', 
-      border: 'border-cyan-400/30', 
-      glow: 'glow-border-cyan' 
-    },
-    { 
-      title: 'Expires Tomorrow', 
-      value: `${stats.expiresSoon}`, 
-      icon: AlertTriangle, 
-      color: 'text-pink-400', 
-      bg: 'bg-pink-400/10', 
-      border: 'border-pink-400/30', 
-      glow: 'glow-border-pink' 
-    },
-  ];
 
   useEffect(() => {
     const interval = setInterval(() => {
@@ -217,14 +89,10 @@ export function Dashboard({ userData, setActiveTab }: { userData: any, setActive
         
         <div className="flex flex-wrap gap-3">
           {actionButtons.map((btn, i) => (
-            <button 
-              key={i} 
-              onClick={() => btn.tab && setActiveTab(btn.tab)}
-              className={clsx(
-                "flex items-center gap-2 px-4 py-2.5 rounded-lg border text-[10px] font-black uppercase tracking-widest transition-all hover:scale-105 hover:brightness-125 shadow-lg",
-                btn.color
-              )}
-            >
+            <button key={i} className={clsx(
+              "flex items-center gap-2 px-4 py-2.5 rounded-lg border text-[10px] font-black uppercase tracking-widest transition-all hover:scale-105 hover:brightness-125 shadow-lg",
+              btn.color
+            )}>
               <btn.icon className="w-4 h-4" />
               {btn.label}
             </button>
@@ -234,7 +102,7 @@ export function Dashboard({ userData, setActiveTab }: { userData: any, setActive
 
       {/* KPI Row */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 relative z-10">
-        {dynamicKpis.map((kpi, i) => (
+        {kpis.map((kpi, i) => (
           <div key={i} className={clsx(
             "glass-panel rounded-xl p-6 relative overflow-hidden group transition-all duration-500 border-white/5 hover:border-white/20",
             kpi.glow
@@ -439,8 +307,6 @@ export function Dashboard({ userData, setActiveTab }: { userData: any, setActive
         </div>
       </div>
 
-      <AITools />
-
       {/* Today's Logs Table */}
       <div className="glass-panel rounded-2xl overflow-hidden border-white/5 relative z-10">
         <div className="absolute inset-0 scanline-cyber opacity-[0.05] pointer-events-none" />
@@ -474,21 +340,23 @@ export function Dashboard({ userData, setActiveTab }: { userData: any, setActive
               </tr>
             </thead>
             <tbody className="divide-y divide-white/5">
-              {logs.map((log, i) => (
+              {todayLogs.map((log) => (
                 <tr key={log.id} className="hover:bg-cyan/5 transition-all group cursor-pointer">
-                  <td className="px-8 py-5 font-mono text-xs text-text-muted group-hover:text-cyan transition-colors">{i + 1}</td>
+                  <td className="px-8 py-5 font-mono text-xs text-text-muted group-hover:text-cyan transition-colors">{log.id}</td>
                   <td className="px-8 py-5">
-                    <span className="px-3 py-1 rounded bg-cyan/10 text-cyan text-[10px] font-black border border-cyan/20 uppercase tracking-widest">{log.deviceType}</span>
+                    <span className="px-3 py-1 rounded bg-cyan/10 text-cyan text-[10px] font-black border border-cyan/20 uppercase tracking-widest">{log.system}</span>
                   </td>
-                  <td className="px-8 py-5 font-mono text-xs text-white group-hover:translate-x-1 transition-transform">{log.identifier}</td>
-                  <td className="px-8 py-5 font-mono text-xs text-text-muted">{log.timestamp}</td>
-                  <td className="px-8 py-5 text-xs text-text-primary font-bold">{log.type}</td>
+                  <td className="px-8 py-5 font-mono text-xs text-white group-hover:translate-x-1 transition-transform">{log.mac}</td>
+                  <td className="px-8 py-5 font-mono text-xs text-text-muted">{log.expire}</td>
+                  <td className="px-8 py-5 text-xs text-text-primary font-bold">{log.reseller}</td>
                   <td className="px-8 py-5">
                     <span className={clsx(
                       "px-3 py-1 rounded text-[10px] font-black uppercase tracking-widest",
-                      log.status === 'success' ? 'bg-green/10 text-green border border-green/20' : 'bg-red/10 text-red border border-red/20'
+                      log.type === 'New' ? 'bg-green/10 text-green border border-green/20' : 
+                      log.type === 'Demo' ? 'bg-orange/10 text-orange border border-orange/20' : 
+                      'bg-violet/10 text-violet border border-violet/20'
                     )}>
-                      {log.status}
+                      {log.type}
                     </span>
                   </td>
                   <td className="px-8 py-5 text-xs font-black text-white text-right font-mono">

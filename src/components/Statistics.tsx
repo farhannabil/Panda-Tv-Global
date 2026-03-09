@@ -1,76 +1,31 @@
-import React, { useState, useEffect } from 'react';
+import React from 'react';
 import { 
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, 
   ResponsiveContainer, PieChart, Pie, Cell, Legend 
 } from 'recharts';
 import { DollarSign, Users, Activity, TrendingUp } from 'lucide-react';
 import { clsx } from 'clsx';
-import { collection, query, where, getDocs } from 'firebase/firestore';
-import { db } from '../lib/firebase';
 
-export function Statistics({ userData, setActiveTab }: { userData: any, setActiveTab: (tab: string) => void }) {
-  const [stats, setStats] = useState<any[]>([]);
-  const [loading, setLoading] = useState(true);
-  const isAdmin = userData?.role === 'ADMIN';
+const subscriptionData = [
+  { name: 'Nov', new: 150, renew: 80, demo: 40 },
+  { name: 'Dec', new: 220, renew: 120, demo: 60 },
+  { name: 'Jan', new: 180, renew: 100, demo: 50 },
+  { name: 'Feb', new: 250, renew: 140, demo: 70 },
+];
 
-  useEffect(() => {
-    const fetchStats = async () => {
-      if (!db) return;
-      try {
-        const linesRef = collection(db, 'lines');
-        const q = isAdmin 
-          ? query(linesRef)
-          : query(linesRef, where('resellerUid', '==', userData.uid));
-        
-        const snapshot = await getDocs(q);
-        const dataByMonth: Record<string, any> = {};
-        
-        snapshot.docs.forEach(doc => {
-          const date = new Date(doc.data().createdAt || doc.data().expireDate);
-          const month = date.toLocaleString('default', { month: 'short' });
-          if (!dataByMonth[month]) {
-            dataByMonth[month] = { name: month, new: 0, renew: 0, demo: 0 };
-          }
-          const type = doc.data().type || 'new';
-          if (type === 'new') dataByMonth[month].new++;
-          else if (type === 'renew') dataByMonth[month].renew++;
-          else dataByMonth[month].demo++;
-        });
+const resellerStats = [
+  { name: 'codexcipher', value: 2.0, color: 'text-cyan' },
+  { name: 'reseller_alpha', value: 3.5, color: 'text-violet' },
+  { name: 'reseller_beta', value: 1.8, color: 'text-pink' },
+];
 
-        const sortedMonths = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-        const chartData = Object.values(dataByMonth).sort((a, b) => 
-          sortedMonths.indexOf(a.name) - sortedMonths.indexOf(b.name)
-        );
+const subTypeData = [
+  { name: 'New', value: 45, color: '#00f5ff' },
+  { name: 'Renew', value: 35, color: '#8b00ff' },
+  { name: 'Demo', value: 20, color: '#ff0080' },
+];
 
-        setStats(chartData.length > 0 ? chartData : [
-          { name: 'Jan', new: 0, renew: 0, demo: 0 },
-          { name: 'Feb', new: 0, renew: 0, demo: 0 }
-        ]);
-      } catch (error) {
-        console.error('Error fetching stats:', error);
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    fetchStats();
-  }, [userData, isAdmin]);
-
-  const subTypeData = stats.length > 0 ? [
-    { name: 'New', value: stats.reduce((acc, curr) => acc + curr.new, 0), color: '#00f5ff' },
-    { name: 'Renew', value: stats.reduce((acc, curr) => acc + curr.renew, 0), color: '#8b00ff' },
-    { name: 'Demo', value: stats.reduce((acc, curr) => acc + curr.demo, 0), color: '#ff0080' },
-  ] : [];
-
-  const totalCredits = subTypeData.reduce((acc, curr) => acc + curr.value, 0);
-
-  if (loading) {
-    return (
-      <div className="flex items-center justify-center p-20">
-        <div className="w-8 h-8 border-4 border-cyan/20 border-t-cyan rounded-full animate-spin" />
-      </div>
-    );
-  }
+export function Statistics() {
   return (
     <div className="p-8 max-w-[1400px] mx-auto space-y-8">
       <div className="flex justify-between items-end">
@@ -83,7 +38,7 @@ export function Statistics({ userData, setActiveTab }: { userData: any, setActiv
             <DollarSign className="w-4 h-4 text-green" />
             <div>
               <p className="text-[8px] font-mono text-text-muted uppercase">Credit Spent</p>
-              <p className="text-sm font-bold text-white">{totalCredits}</p>
+              <p className="text-sm font-bold text-white">16</p>
             </div>
           </div>
         </div>
@@ -102,7 +57,7 @@ export function Statistics({ userData, setActiveTab }: { userData: any, setActiv
           </div>
           <div className="h-[400px]">
             <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={stats}>
+              <BarChart data={subscriptionData}>
                 <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.03)" vertical={false} />
                 <XAxis dataKey="name" stroke="rgba(255,255,255,0.1)" tick={{fill: 'rgba(255,255,255,0.3)', fontSize: 10}} />
                 <YAxis stroke="rgba(255,255,255,0.1)" tick={{fill: 'rgba(255,255,255,0.3)', fontSize: 10}} />
@@ -121,12 +76,19 @@ export function Statistics({ userData, setActiveTab }: { userData: any, setActiv
         {/* Side Stats */}
         <div className="lg:col-span-4 space-y-8">
           <div className="glass-panel rounded-2xl p-6 border-white/5">
-            <h3 className="text-lg font-display font-bold text-white uppercase tracking-wider mb-6">System Distribution</h3>
+            <h3 className="text-lg font-display font-bold text-white uppercase tracking-wider mb-6">Today's Reseller Statistics</h3>
             <div className="space-y-6">
-              <div className="p-4 bg-cyan/5 border border-cyan/20 rounded-xl">
-                <p className="text-[10px] font-mono text-cyan uppercase mb-1">Total Volume</p>
-                <p className="text-2xl font-black text-white">{totalCredits} Units</p>
-              </div>
+              {resellerStats.map((stat, i) => (
+                <div key={i} className="space-y-2">
+                  <div className="flex justify-between text-[10px] font-mono uppercase">
+                    <span className="text-text-muted">{stat.name}</span>
+                    <span className={stat.color}>{stat.value}</span>
+                  </div>
+                  <div className="h-1.5 bg-white/5 rounded-full overflow-hidden">
+                    <div className={clsx("h-full rounded-full", stat.color.replace('text', 'bg'))} style={{ width: `${(stat.value / 5) * 100}%` }} />
+                  </div>
+                </div>
+              ))}
             </div>
           </div>
 

@@ -1,10 +1,4 @@
 export const VOD_LIST = [
-  "🎬 BLOCKBUSTER CINEMA",
-  "🎥 NETFLIX ORIGINALS",
-  "🍿 BINGE-WORTHY SERIES",
-  "🏆 LIVE SPORTS VAULT",
-  "⛩️ ANIME UNIVERSE",
-  "🚀 KIDS GALAXY",
   "BROADWAY/MUSICAL",
   "Netflix Premium 4K + HDR",
   "NETFLIX 4K (ULTRA HD) + HDR Kids",
